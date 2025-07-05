@@ -22,7 +22,7 @@ function App() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://localhost:8000/upload-descriptions', {
+      const response = await fetch('https://image-description-mapper.onrender.com/upload-descriptions', {
         method: 'POST',
         body: formData,
       });
@@ -55,7 +55,7 @@ function App() {
     setOutput(null); // Clear previous output
   
     try {
-      const response = await fetch('http://localhost:8000/map-description', {
+      const response = await fetch('https://image-description-mapper.onrender.com/map-description', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
