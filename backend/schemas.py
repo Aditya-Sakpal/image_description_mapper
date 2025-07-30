@@ -3,6 +3,9 @@ from pydantic import BaseModel
 class ImageUrlRequest(BaseModel):
     image_url: str
 
+class TextExtractionOutput(BaseModel):
+    text:str
+
 class CandidateDescription(BaseModel):
     candidate_description_index: str
     candidate_description: str

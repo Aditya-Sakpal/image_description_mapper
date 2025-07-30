@@ -3,12 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
+import traceback
 import os 
+from prompts import TEXT_EXTRACTION_PROMPT , DESCRIPTION_MAPPING_PROMPT
+from rag_pipeline import VectorSearch
 from dotenv import load_dotenv
+from schemas import ExpectedOutput, ImageUrlRequest , TextExtractionOutput
 
+vector_search = VectorSearch()
 load_dotenv()
 
-from schemas import ExpectedOutput, ImageUrlRequest
 
 model = ChatOpenAI(
     model="gpt-4.1", 
@@ -91,4 +95,62 @@ async def map_description(request: ImageUrlRequest):
         response = response.dict()
         return JSONResponse(content=response)
     except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error mapping description: {str(e)}")
+    
+
+@app.post("/map-description-v2")
+async def map_description(request: ImageUrlRequest):
+    try:
+        content = [
+            {
+                "type": "text",
+                "text": TEXT_EXTRACTION_PROMPT
+            },
+            {
+                "type": "image",
+                "source_type": "url",
+                "url": request.image_url,
+            },            
+        ]
+        message = HumanMessage(content=content)
+        response = model.with_structured_output(TextExtractionOutput)
+        response = response.invoke([message])
+        response = response.dict()
+        extracted_text = response['text']
+
+        if extracted_text:
+            chunks = vector_search.search_similar_chunks(
+                query_text=extracted_text
+            )
+            
+            chunks_data = ""
+
+            for chunk in chunks :
+                chunks_data = chunk['text'] + '\n'
+
+            content = [
+                {
+                    "type": "text",
+                    "text": DESCRIPTION_MAPPING_PROMPT.format(
+                        descriptions="\n".join(descriptions),
+                        extracted_text=extracted_text,
+                        chunks= chunks_data
+                    )
+                },
+                {
+                    "type": "image",
+                    "source_type": "url",
+                    "url": request.image_url,
+                },            
+            ]
+            message = HumanMessage(content=content)
+            response = model.with_structured_output(ExpectedOutput)
+            response = response.invoke([message])
+            response = response.dict()
+        else:
+            response = ""
+        
+        return JSONResponse(content=response)
+    except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error mapping description: {str(e)}")
